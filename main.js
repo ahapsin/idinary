@@ -5,7 +5,7 @@ const fs = require("fs");
 const cors = require("cors"); // ⬅️ Tambahkan ini
 
 const app = express();
-const PORT = 3000;
+const PORT = 8000;
 const host="https://source.bprcahayafajar.co.id"
 
 // ✅ Aktifkan CORS untuk semua origin
