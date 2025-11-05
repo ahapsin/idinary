@@ -151,8 +151,7 @@ app.get("/files", (req, res) => {
     .join("");
 
   res.send(`
-    <h2>📂 Semua File dan Folder</h2>
-    <p>Urut berdasarkan tanggal terakhir ditambahkan (terbaru di atas)</p>
+    <h2>📂 Semua File</h2>
     <div style="display:flex;flex-wrap:wrap;gap:10px;">${htmlList}</div>
   `);
 });
