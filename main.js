@@ -2,20 +2,18 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const cors = require("cors"); // ⬅️ Tambahkan ini
+const cors = require("cors");
 
 const app = express();
 const PORT = 8000;
-const host="https://pubvault.bprcahayafajar.co.id"
+const host = "https://pubvault.bprcahayafajar.co.id";
 
-// ✅ Aktifkan CORS untuk semua origin
 app.use(cors());
+app.use(express.json());
 
-// pastikan folder uploads ada
+// Pastikan folder uploads ada
 const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 // Konfigurasi multer
 const storage = multer.diskStorage({
@@ -28,90 +26,139 @@ const storage = multer.diskStorage({
     cb(null, file.fieldname + "-" + uniqueSuffix + ext);
   },
 });
-
 const upload = multer({ storage });
 
-// Middleware
-app.use(express.json());
-app.use("/uploads", express.static(uploadDir)); // agar bisa diakses via URL
+app.use("/uploads", express.static(uploadDir));
 
-// Route root
+// 🏠 Root
 app.get("/", (req, res) => {
-  res.send("Hello server is really running now! <br/><a href='/files'>Telusuri file</a>");
+  res.send("✅ Server aktif <br/><a href='/files'>📂 Lihat semua file</a>");
 });
 
-// Route upload (single file)
+// 📤 Upload 1 file
 app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: "No file uploaded." });
-  }
+  if (!req.file) return res.status(400).json({ message: "No file uploaded." });
 
   res.json({
     message: "File uploaded successfully.",
     filename: req.file.filename,
-    path: `/public/${req.file.filename}`,
-    url: `https://pubvault.bprcahayafajar.co.id/uploads/${req.file.filename}`,
+    url: `${host}/uploads/${req.file.filename}`,
   });
 });
 
-// Route upload multiple files
+// 📤 Upload multiple
 app.post("/upload-multiple", upload.array("files", 5), (req, res) => {
-  if (!req.files || req.files.length === 0) {
+  if (!req.files || req.files.length === 0)
     return res.status(400).json({ message: "No files uploaded." });
-  }
 
   const files = req.files.map((file) => ({
     filename: file.filename,
-    path: `/uploads/${file.filename}`,
-    url: `https://pubvault.bprcahayafajar.co.id/uploads/${file.filename}`,
+    url: `${host}/uploads/${file.filename}`,
   }));
 
-  res.json({
-    message: "Files uploaded successfully.",
-    files,
-  });
+  res.json({ message: "Files uploaded successfully.", files });
 });
 
-// 📂 Route daftar file yang sudah diupload
-app.get("/files", (req, res) => {
-  fs.readdir(uploadDir, (err, files) => {
-    if (err) return res.status(500).send("Gagal membaca folder uploads");
+// 🔍 Fungsi baca seluruh file dan subfolder
+function readAllFiles(dir, baseUrl = "/uploads") {
+  const items = [];
+  const list = fs.readdirSync(dir);
 
-    if (files.length === 0) {
-      return res.send(
-        '<h3>Tidak ada file yang diupload.</h3><p><a href="/upload-form">Upload sekarang</a></p>'
-      );
+  list.forEach((name) => {
+    const filePath = path.join(dir, name);
+    const stat = fs.statSync(filePath);
+
+    if (stat.isDirectory()) {
+      items.push({
+        type: "folder",
+        name,
+        children: readAllFiles(filePath, `${baseUrl}/${name}`),
+      });
+    } else {
+      const ext = path.extname(name).toLowerCase();
+      const isImage = [".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext);
+      items.push({
+        type: "file",
+        name,
+        url: `${host}${baseUrl}/${name}`,
+        isImage,
+      });
     }
-
-    const fileList = files
-      .map((file) => {
-        const fileUrl = `/uploads/${file}`;
-        const ext = path.extname(file).toLowerCase();
-        const isImage = [".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(
-          ext
-        );
-
-        return `
-        <div style="margin:10px;padding:10px;border:1px solid #ddd;border-radius:8px;display:inline-block;text-align:center;">
-          ${
-            isImage
-              ? `<img src="${fileUrl}" width="150" style="display:block;margin-bottom:8px;border-radius:4px;" />`
-              : "📄"
-          }
-          <a href="${fileUrl}" target="_blank">${file}</a>
-        </div>
-      `;
-      })
-      .join("");
-
-    res.send(`
-      <h2>📂 Files</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;">${fileList}</div>
-    `);
   });
+
+  return items;
+}
+
+// 🧩 Render HTML rekursif
+function renderTree(items) {
+  return `
+  <ul style="list-style:none; margin-left:20px; padding-left:10px; border-left:1px dashed #ccc;">
+    ${items
+      .map((item) => {
+        if (item.type === "folder") {
+          return `
+            <li>
+              <details>
+                <summary style="cursor:pointer; font-weight:bold; color:#0366d6;">📁 ${item.name}</summary>
+                ${renderTree(item.children)}
+              </details>
+            </li>
+          `;
+        } else {
+          return `
+            <li style="margin:6px 0;">
+              ${
+                item.isImage
+                  ? `<a href="${item.url}" target="_blank">
+                      <img src="${item.url}" width="100" style="border-radius:6px; vertical-align:middle; margin-right:6px;" />
+                    </a>`
+                  : "📄 "
+              }
+              <a href="${item.url}" target="_blank" style="text-decoration:none; color:#333;">${item.name}</a>
+            </li>
+          `;
+        }
+      })
+      .join("")}
+  </ul>`;
+}
+
+// 📂 Route tampilkan semua file dan subfolder
+app.get("/files", (req, res) => {
+  try {
+    const structure = readAllFiles(uploadDir);
+    const html = `
+      <html>
+      <head>
+        <title>📂 File</title>
+        <style>
+          body {
+            font-family: "Segoe UI", sans-serif;
+            background: #f9f9f9;
+            color: #333;
+            padding: 20px;
+          }
+          h1 { color: #0366d6; }
+          summary:hover { text-decoration: underline; }
+          img { box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: transform .2s; }
+          img:hover { transform: scale(1.05); }
+        </style>
+      </head>
+      <body>
+        <h1>📂 File</h1>
+        <p>Total item: ${structure.length}</p>
+        ${renderTree(structure)}
+      </body>
+      </html>
+    `;
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Gagal membaca folder uploads");
+  }
 });
 
-// Jalankan server
+// 🚀 Jalankan server
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running at ${host}:${PORT}`);
 });
