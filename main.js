@@ -8,22 +8,20 @@ const app = express();
 const PORT = 8000;
 const host = "https://pubvault.bprcahayafajar.co.id";
 
-// Middleware dasar
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // Pastikan folder uploads ada
 const uploadDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 // ⚙️ Konfigurasi multer (maks 3 MB)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
+    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
   },
 });
 
@@ -32,30 +30,20 @@ const upload = multer({
   limits: { fileSize: 3 * 1024 * 1024 }, // ⬅️ batas 3 MB
 });
 
-// 🔒 Middleware tangkap error ukuran file
-app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
-    return res.status(400).json({ message: "Ukuran file melebihi 3 MB." });
-  }
-  next(err);
-});
-
 // Serve file statis
 app.use("/uploads", express.static(uploadDir));
 
 // 🏠 Halaman utama
 app.get("/", (req, res) => {
-  res.send("✅ Server aktif! <br/><a href='/files'>📂 Lihat file</a>");
+  res.send("✅ Server aktif! <br/><a href='/files'>📂 Lihat semua file</a>");
 });
 
 // 📤 Upload satu file
-app.post("/upload", (req, res, next) => {
-  upload.single("file")(req, res, function (err) {
-    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+app.post("/upload", (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE")
       return res.status(400).json({ message: "Ukuran file melebihi 3 MB." });
-    } else if (err) {
-      return res.status(500).json({ message: "Gagal upload file.", error: err.message });
-    }
+    if (err) return res.status(500).json({ message: "Gagal upload file.", error: err.message });
     if (!req.file) return res.status(400).json({ message: "Tidak ada file yang diupload." });
 
     res.json({
@@ -66,14 +54,12 @@ app.post("/upload", (req, res, next) => {
   });
 });
 
-// 📤 Upload multiple file
-app.post("/upload-multiple", (req, res, next) => {
-  upload.array("files", 5)(req, res, function (err) {
-    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+// 📤 Upload multiple files
+app.post("/upload-multiple", (req, res) => {
+  upload.array("files", 5)(req, res, (err) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE")
       return res.status(400).json({ message: "Salah satu file melebihi 3 MB." });
-    } else if (err) {
-      return res.status(500).json({ message: "Gagal upload file.", error: err.message });
-    }
+    if (err) return res.status(500).json({ message: "Gagal upload file.", error: err.message });
     if (!req.files?.length) return res.status(400).json({ message: "Tidak ada file yang diupload." });
 
     const files = req.files.map((file) => ({
@@ -85,7 +71,7 @@ app.post("/upload-multiple", (req, res, next) => {
   });
 });
 
-// 🔍 Fungsi baca semua file/folder
+// 🔍 Baca semua file dan folder (rekursif)
 function readAllFiles(dir, baseUrl = "/uploads") {
   let results = [];
   const list = fs.readdirSync(dir);
@@ -93,8 +79,6 @@ function readAllFiles(dir, baseUrl = "/uploads") {
   list.forEach((file) => {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
-    const ext = path.extname(file).toLowerCase();
-    const isImage = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext);
 
     if (stat.isDirectory()) {
       results.push({
@@ -104,12 +88,29 @@ function readAllFiles(dir, baseUrl = "/uploads") {
         children: readAllFiles(filePath, `${baseUrl}/${file}`),
       });
     } else {
+      const ext = path.extname(file).toLowerCase();
+      const isImage = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext);
+      const icon = isImage
+        ? "🖼️"
+        : [".pdf"].includes(ext)
+        ? "📕"
+        : [".zip", ".rar"].includes(ext)
+        ? "🗜️"
+        : [".doc", ".docx"].includes(ext)
+        ? "📄"
+        : [".xls", ".xlsx"].includes(ext)
+        ? "📊"
+        : [".txt", ".md"].includes(ext)
+        ? "📘"
+        : "📁";
+
       results.push({
         type: "file",
         name: file,
         path: `${baseUrl}/${file}`,
         url: `${host}${baseUrl}/${file}`,
         isImage,
+        icon,
       });
     }
   });
@@ -117,7 +118,7 @@ function readAllFiles(dir, baseUrl = "/uploads") {
   return results;
 }
 
-// 🔧 Fungsi buat HTML pohon file/folder
+// 🔧 Render pohon file ke HTML
 function renderTree(items) {
   return `
     <ul style="list-style:none; margin-left:20px; padding-left:10px; border-left:1px dashed #ccc;">
@@ -134,12 +135,12 @@ function renderTree(items) {
             `;
           } else {
             return `
-              <li style="margin:4px 0;">
+              <li style="margin:6px 0;">
                 ${item.isImage
                   ? `<a href="${item.url}" target="_blank">
-                      <img src="${item.url}" width="100" style="border-radius:6px; vertical-align:middle; margin-right:6px;" />
+                      <img src="${item.url}" width="100" style="border-radius:6px; vertical-align:middle; margin-right:8px; box-shadow:0 1px 4px rgba(0,0,0,0.2);" />
                     </a>`
-                  : "📄 "}
+                  : `${item.icon} `}
                 <a href="${item.url}" target="_blank" style="text-decoration:none; color:#333;">${item.name}</a>
               </li>
             `;
@@ -150,23 +151,24 @@ function renderTree(items) {
   `;
 }
 
-// 📁 Route tampilkan semua file
+// 📂 Route tampilkan semua file dalam HTML interaktif
 app.get("/files", (req, res) => {
   try {
     const structure = readAllFiles(uploadDir);
     const html = `
       <html>
       <head>
-        <title>📂 Files</title>
+        <title>📂 File Explorer</title>
         <style>
           body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; color: #333; padding: 20px; }
           h1 { color: #0366d6; }
           summary:hover { text-decoration: underline; }
-          img { box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+          img { transition: 0.2s; }
+          img:hover { transform: scale(1.05); }
         </style>
       </head>
       <body>
-        <h1>📂 Files</h1>
+        <h1>📂 File Explorer</h1>
         <p>Total item: ${structure.length}</p>
         ${renderTree(structure)}
       </body>
