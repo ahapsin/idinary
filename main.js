@@ -37,7 +37,7 @@ app.use("/uploads", express.static(uploadDir)); // agar bisa diakses via URL
 
 // Route root
 app.get("/", (req, res) => {
-  res.send("Hello server is really running now!");
+  res.send("Hello server is really running now! <br/><a href='/files'>Telusuri file</a>");
 });
 
 // Route upload (single file)
