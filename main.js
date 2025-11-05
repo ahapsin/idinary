@@ -157,7 +157,7 @@ app.get("/files", (req, res) => {
     const html = `
       <html>
       <head>
-        <title>📂 File Explorer</title>
+        <title>📂 Files</title>
         <style>
           body { font-family: "Segoe UI", sans-serif; background: #f9f9f9; color: #333; padding: 20px; }
           h1 { color: #0366d6; }
@@ -166,7 +166,7 @@ app.get("/files", (req, res) => {
         </style>
       </head>
       <body>
-        <h1>📂 File Explorer</h1>
+        <h1>📂 Files</h1>
         <p>Total item: ${structure.length}</p>
         ${renderTree(structure)}
       </body>
