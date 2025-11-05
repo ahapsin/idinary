@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 const uploadRoot = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadRoot)) fs.mkdirSync(uploadRoot);
 
-// Fungsi rekursif baca semua file dan subfolder
+// 🔁 Rekursif baca semua file dan subfolder
 function readAllFiles(dir, baseUrl = "/uploads") {
   let results = [];
   const list = fs.readdirSync(dir);
@@ -35,14 +35,22 @@ function readAllFiles(dir, baseUrl = "/uploads") {
   return results;
 }
 
-// Konfigurasi multer dinamis
+// ⚙️ Konfigurasi multer dinamis (pakai path dari body)
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const key = req.body.key || "default"; // key dari body
-    const folderPath = path.join(uploadRoot, key);
+    let relativePath = req.body.path ? req.body.path.trim() : "";
+
+    // Jika path kosong → simpan di folder utama "uploads"
+    if (!relativePath) {
+      cb(null, uploadRoot);
+      return;
+    }
+
+    const folderPath = path.join(uploadRoot, relativePath);
     if (!fs.existsSync(folderPath)) {
       fs.mkdirSync(folderPath, { recursive: true });
     }
+
     cb(null, folderPath);
   },
   filename: function (req, file, cb) {
@@ -54,59 +62,58 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB max
+  limits: { fileSize: 3 * 1024 * 1024 }, // Maks 3MB
 });
 
 app.use("/uploads", express.static(uploadRoot));
 
-// Route utama
+// 🏠 Route utama
 app.get("/", (req, res) => {
   res.send(
     `<h2>🚀 Server running!</h2>
-    <a href="/files">📂 Lihat semua file</a>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-      <p><input type="text" name="key" placeholder="Masukkan nama folder" required></p>
-      <p><input type="file" name="file" required></p>
-      <button type="submit">Upload</button>
-    </form>`
+    <a href="/files">📂 Lihat semua file</a>`
   );
 });
 
-// Upload file tunggal
+// 📤 Upload file tunggal
 app.post("/upload", upload.single("file"), (req, res) => {
   if (!req.file)
     return res.status(400).json({ message: "Tidak ada file yang diupload." });
 
-  const key = req.body.key || "default";
+  const relativePath = req.body.path?.trim() || "";
+  const folderUrl = relativePath ? `/uploads/${relativePath}` : `/uploads`;
+
   res.json({
     message: "File uploaded successfully.",
-    key,
+    path: relativePath || "/",
     filename: req.file.filename,
-    path: `/uploads/${key}/${req.file.filename}`,
-    url: `${host}/uploads/${key}/${req.file.filename}`,
+    fullPath: `${folderUrl}/${req.file.filename}`,
+    url: `${host}${folderUrl}/${req.file.filename}`,
   });
 });
 
-// Upload banyak file
+// 📤 Upload banyak file
 app.post("/upload-multiple", upload.array("files", 5), (req, res) => {
   if (!req.files || req.files.length === 0)
     return res.status(400).json({ message: "Tidak ada file yang diupload." });
 
-  const key = req.body.key || "default";
+  const relativePath = req.body.path?.trim() || "";
+  const folderUrl = relativePath ? `/uploads/${relativePath}` : `/uploads`;
+
   const files = req.files.map((file) => ({
     filename: file.filename,
-    path: `/uploads/${key}/${file.filename}`,
-    url: `${host}/uploads/${key}/${file.filename}`,
+    fullPath: `${folderUrl}/${file.filename}`,
+    url: `${host}${folderUrl}/${file.filename}`,
   }));
 
   res.json({
     message: "Files uploaded successfully.",
-    key,
+    path: relativePath || "/",
     files,
   });
 });
 
-// Tampilkan semua file dan subfolder
+// 📁 Tampilkan semua file dan subfolder
 app.get("/files", (req, res) => {
   const allFiles = readAllFiles(uploadRoot);
 
@@ -127,7 +134,7 @@ app.get("/files", (req, res) => {
             <div style="display:flex;flex-wrap:wrap;gap:10px;">${htmlList}</div>`);
 });
 
-// Jalankan server
+// 🚀 Jalankan server
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running at ${host}:${PORT}`);
 });
