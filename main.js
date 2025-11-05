@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 const uploadRoot = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadRoot)) fs.mkdirSync(uploadRoot);
 
-// 🔁 Rekursif baca semua file dan subfolder
+// 🔁 Rekursif baca semua file dan subfolder, dengan tanggal & ukuran
 function readAllFiles(dir, baseUrl = "/uploads") {
   let results = [];
   const list = fs.readdirSync(dir);
@@ -29,10 +29,21 @@ function readAllFiles(dir, baseUrl = "/uploads") {
         name: file,
         url: `${host}${baseUrl}/${file}`,
         path: `${baseUrl}/${file}`,
+        modified: stat.mtime,
+        size: stat.size, // dalam byte
       });
     }
   });
   return results;
+}
+
+// 🔢 Fungsi bantu ubah ukuran byte ke format KB/MB/GB
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 // ⚙️ Konfigurasi multer dinamis (pakai path dari body)
@@ -87,6 +98,7 @@ app.post("/upload", upload.single("file"), (req, res) => {
     message: "File uploaded successfully.",
     path: relativePath || "/",
     filename: req.file.filename,
+    size: req.file.size,
     fullPath: `${folderUrl}/${req.file.filename}`,
     url: `${host}${folderUrl}/${req.file.filename}`,
   });
@@ -102,6 +114,7 @@ app.post("/upload-multiple", upload.array("files", 5), (req, res) => {
 
   const files = req.files.map((file) => ({
     filename: file.filename,
+    size: file.size,
     fullPath: `${folderUrl}/${file.filename}`,
     url: `${host}${folderUrl}/${file.filename}`,
   }));
@@ -113,25 +126,35 @@ app.post("/upload-multiple", upload.array("files", 5), (req, res) => {
   });
 });
 
-// 📁 Tampilkan semua file dan subfolder
+// 📁 Tampilkan semua file dan subfolder (urut berdasarkan tanggal terbaru)
 app.get("/files", (req, res) => {
-  const allFiles = readAllFiles(uploadRoot);
+  let allFiles = readAllFiles(uploadRoot);
 
   if (allFiles.length === 0)
     return res.send("<h3>Tidak ada file yang diupload.</h3>");
 
+  // 🔽 Urutkan berdasarkan tanggal terakhir dimodifikasi (terbaru di atas)
+  allFiles.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+
   const htmlList = allFiles
     .map(
       (f) => `
-    <div style="margin:10px;padding:10px;border:1px solid #ddd;border-radius:8px;display:inline-block;text-align:center;">
-      <a href="${f.url}" target="_blank">${f.name}</a><br>
-      <small>${f.path}</small>
+    <div style="margin:10px;padding:10px;border:1px solid #ddd;border-radius:8px;display:inline-block;text-align:left;width:240px;">
+      <a href="${f.url}" target="_blank" style="font-weight:bold;">${f.name}</a><br>
+      <small style="color:#666;">${f.path}</small><br>
+      <small>🕓 ${new Date(f.modified)
+        .toLocaleString("id-ID", { hour12: false })
+        .replace(",", "")}</small><br>
+      <small>💾 ${formatFileSize(f.size)}</small>
     </div>`
     )
     .join("");
 
-  res.send(`<h2>📂 Semua File dan Folder</h2>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;">${htmlList}</div>`);
+  res.send(`
+    <h2>📂 Semua File dan Folder</h2>
+    <p>Urut berdasarkan tanggal terakhir ditambahkan (terbaru di atas)</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">${htmlList}</div>
+  `);
 });
 
 // 🚀 Jalankan server
