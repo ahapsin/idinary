@@ -6,7 +6,7 @@ const cors = require("cors"); // ⬅️ Tambahkan ini
 
 const app = express();
 const PORT = 8000;
-const host="https://source.bprcahayafajar.co.id"
+const host="https://pubvault.bprcahayafajar.co.id"
 
 // ✅ Aktifkan CORS untuk semua origin
 app.use(cors());
@@ -50,7 +50,7 @@ app.post("/upload", upload.single("file"), (req, res) => {
     message: "File uploaded successfully.",
     filename: req.file.filename,
     path: `/public/${req.file.filename}`,
-    url: `http://localhost:${PORT}/uploads/${req.file.filename}`,
+    url: `https://pubvault.bprcahayafajar.co.id/uploads/${req.file.filename}`,
   });
 });
 
@@ -63,7 +63,7 @@ app.post("/upload-multiple", upload.array("files", 5), (req, res) => {
   const files = req.files.map((file) => ({
     filename: file.filename,
     path: `/uploads/${file.filename}`,
-    url: `http://localhost:${PORT}/uploads/${file.filename}`,
+    url: `https://pubvault.bprcahayafajar.co.id/uploads/${file.filename}`,
   }));
 
   res.json({
