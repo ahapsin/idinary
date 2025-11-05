@@ -6,6 +6,7 @@ const cors = require("cors"); // ⬅️ Tambahkan ini
 
 const app = express();
 const PORT = 3000;
+const host="https://source.bprcahayafajar.co.id"
 
 // ✅ Aktifkan CORS untuk semua origin
 app.use(cors());
@@ -48,7 +49,7 @@ app.post("/upload", upload.single("file"), (req, res) => {
   res.json({
     message: "File uploaded successfully.",
     filename: req.file.filename,
-    path: `/uploads/${req.file.filename}`,
+    path: `/public/${req.file.filename}`,
     url: `http://localhost:${PORT}/uploads/${req.file.filename}`,
   });
 });
@@ -77,21 +78,31 @@ app.get("/files", (req, res) => {
     if (err) return res.status(500).send("Gagal membaca folder uploads");
 
     if (files.length === 0) {
-      return res.send('<h3>Tidak ada file yang diupload.</h3><p><a href="/upload-form">Upload sekarang</a></p>');
+      return res.send(
+        '<h3>Tidak ada file yang diupload.</h3><p><a href="/upload-form">Upload sekarang</a></p>'
+      );
     }
 
-    const fileList = files.map((file) => {
-      const fileUrl = `/uploads/${file}`;
-      const ext = path.extname(file).toLowerCase();
-      const isImage = [".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext);
+    const fileList = files
+      .map((file) => {
+        const fileUrl = `/uploads/${file}`;
+        const ext = path.extname(file).toLowerCase();
+        const isImage = [".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(
+          ext
+        );
 
-      return `
+        return `
         <div style="margin:10px;padding:10px;border:1px solid #ddd;border-radius:8px;display:inline-block;text-align:center;">
-          ${isImage ? `<img src="${fileUrl}" width="150" style="display:block;margin-bottom:8px;border-radius:4px;" />` : "📄"}
+          ${
+            isImage
+              ? `<img src="${fileUrl}" width="150" style="display:block;margin-bottom:8px;border-radius:4px;" />`
+              : "📄"
+          }
           <a href="${fileUrl}" target="_blank">${file}</a>
         </div>
       `;
-    }).join("");
+      })
+      .join("");
 
     res.send(`
       <h2>📂 Files</h2>
@@ -101,6 +112,6 @@ app.get("/files", (req, res) => {
 });
 
 // Jalankan server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running at ${host}:${PORT}`);
 });
