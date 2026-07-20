@@ -2,7 +2,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const cors = require("cors");
-
+const mime = require("mime-types");
 const app = express();
 const PORT = 8000;
 const host = "https://pubvault.bprcahayafajar.co.id";
@@ -115,7 +115,7 @@ app.post("/upload-base64", (req, res) => {
 
   const mime = match[1];
   const base64Data = match[2];
-  const ext = extMap[mime] || "bin";
+  const ext = mime.extension(match[1]) || "bin";
 
   const buffer = Buffer.from(base64Data, "base64");
 
