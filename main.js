@@ -2,7 +2,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const cors = require("cors");
-const mime = require("mime-types");
+const mimeTypes = require("mime-types");
 const app = express();
 const PORT = 8000;
 const host = "https://pubvault.bprcahayafajar.co.id";
@@ -113,9 +113,9 @@ app.post("/upload-base64", (req, res) => {
     return res.status(400).json({ message: "Format base64 tidak valid" });
   }
 
-  const mime = match[1];
+  const mimeType = match[1];
   const base64Data = match[2];
-  const ext = mime.extension(match[1]) || "bin";
+  const ext = mimeTypes.extension(mimeType) || "bin";
 
   const buffer = Buffer.from(base64Data, "base64");
 
