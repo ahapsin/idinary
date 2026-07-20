@@ -38,9 +38,7 @@ function readAllFiles(dir, baseUrl = "/uploads") {
     const stat = fs.statSync(filePath);
 
     if (stat.isDirectory()) {
-      results = results.concat(
-        readAllFiles(filePath, `${baseUrl}/${file}`)
-      );
+      results = results.concat(readAllFiles(filePath, `${baseUrl}/${file}`));
     } else {
       results.push({
         name: file,
@@ -70,7 +68,19 @@ const extMap = {
   "image/png": "png",
   "image/webp": "webp",
   "image/gif": "gif",
+
   "application/pdf": "pdf",
+
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
+
+  "application/zip": "zip",
+  "application/x-rar-compressed": "rar",
+  "application/vnd.rar": "rar",
 };
 
 /* =======================
